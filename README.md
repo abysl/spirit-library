@@ -1,10 +1,14 @@
-# The Spirit Library
+# Spirit Library
 
-`spirit`
+`spirit-library`
 
 > "Form changes. Identity endures."
 
 A content-addressed store and reproducible transformation pipeline for distributed applications, built on [iroh](https://github.com/n0-computer/iroh).
+
+This repository is standalone. It provides the generic identity, blob, record,
+collection, gossip, routing, node, gateway, and client crates used by Agni and
+other distributed applications.
 
 ---
 
