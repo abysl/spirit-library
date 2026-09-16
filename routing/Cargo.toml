@@ -1,0 +1,12 @@
+[package]
+name = "spirit-routing"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ciborium = "0.2"
+spirit-core = { path = "../core" }
+spirit-index = { path = "../index" }
+
+[dev-dependencies]
+serde_json = "1"

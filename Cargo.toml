@@ -1,0 +1,12 @@
+[workspace]
+members = [
+  "client",
+  "client-ffi",
+  "core",
+  "index",
+  "node",
+  "routing",
+  "schema",
+  "sdk",
+]
+resolver = "2"

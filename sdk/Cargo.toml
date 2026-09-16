@@ -1,0 +1,10 @@
+[package]
+name = "spirit-sdk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spirit-core = { path = "../core" }
+spirit-index = { path = "../index" }
+spirit-routing = { path = "../routing" }
+spirit-schema = { path = "../schema" }

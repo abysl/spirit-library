@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spirit</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6860; --line: #e2dfd8;
+    --accent: #2f6f8f; --accent-ink: #ffffff; --ok: #2e7d4f; --warn: #b3541e; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17181a; --panel: #1f2124; --ink: #e8e6e1; --muted: #9a978f; --line: #2e3136; --accent: #7fb3d1; --accent-ink: #101214; --ok: #6fc28f; --warn: #e0925c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+  header .id { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  header label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); margin-left: auto; }
+  header input { width: 280px; }
+  nav { display: flex; gap: 4px; padding: 10px 20px 0; border-bottom: 1px solid var(--line); }
+  nav button { background: none; border: 1px solid transparent; border-bottom: none; padding: 8px 14px; cursor: pointer; color: var(--muted); font: inherit; border-radius: 6px 6px 0 0; }
+  nav button.active { color: var(--ink); background: var(--panel); border-color: var(--line); margin-bottom: -1px; }
+  main { padding: 20px; max-width: 1400px; }
+  section { display: none; }
+  section.active { display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .stat .v { font-size: 22px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat .v.small { font-size: 12px; font-family: var(--mono); word-break: break-all; }
+  h2 { font-size: 15px; margin: 22px 0 8px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .hash { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .hash.short { white-space: nowrap; }
+  a { color: var(--accent); }
+  a.row { cursor: pointer; text-decoration: none; }
+  a.row:hover { text-decoration: underline; }
+  .two { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 2fr); gap: 20px; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+  form { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  form h3 { margin: 0 0 10px; font-size: 13px; }
+  form label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input, textarea, select { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+  textarea { font-family: var(--mono); font-size: 12px; min-height: 90px; }
+  button.go { margin-top: 10px; background: var(--accent); color: var(--accent-ink); border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font: inherit; }
+  button.go:disabled { opacity: 0.5; cursor: default; }
+  .out { margin-top: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all; color: var(--muted); }
+  .out.ok { color: var(--ok); }
+  .out.err { color: var(--warn); }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 12px; overflow-x: auto; margin: 0; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+  .muted { color: var(--muted); }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .toolbar input { max-width: 360px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>spirit</h1>
+  <span class="id" id="who">connecting…</span>
+  <label>write token <input id="token" type="password" placeholder="contents of <store>/gateway-token"></label>
+</header>
+<nav>
+  <button data-tab="status" class="active">Status</button>
+  <button data-tab="identities">Identities</button>
+  <button data-tab="collections">Collections</button>
+  <button data-tab="blobs">Blobs</button>
+  <button data-tab="mint">Mint</button>
+</nav>
+<main>
+  <section id="status" class="active">
+    <div class="grid" id="stat-grid"></div>
+    <h2>Peers</h2>
+    <table id="peers"><thead><tr><th>id</th><th>state</th><th>path</th><th>rtt</th><th>wire</th><th>payload</th><th>advertises</th><th>last activity</th></tr></thead><tbody></tbody></table>
+    <h2>Refs</h2>
+    <table id="refs"><thead><tr><th>name</th><th>head</th><th>held / total</th><th></th></tr></thead><tbody></tbody></table>
+    <h2>Trust</h2>
+    <table id="trust"><thead><tr><th>dgid</th><th>level</th></tr></thead><tbody></tbody></table>
+    <h2>Group</h2>
+    <div class="two">
+      <div>
+        <table id="members"><thead><tr><th>device</th><th>state</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <form id="f-pair">
+          <h3>Pair a new device</h3>
+          <p class="muted">Offers a one-use code valid for ten minutes. Scan it, or paste the link into <code>spirit-node join</code> on the other device.</p>
+          <button class="go">Offer a pairing code</button><div class="out"></div>
+          <pre id="pair-qr" hidden></pre>
+        </form>
+        <form id="f-join">
+          <h3>Join another group</h3>
+          <p class="muted">This device leaves its current group and takes the offering group's key.</p>
+          <label>pairing link</label><input name="url" placeholder="spirit://pair?ticket=…&amp;dgid=…&amp;token=…" required>
+          <button class="go">Join</button><div class="out"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="identities">
+    <div class="two">
+      <div>
+        <div class="toolbar"><input id="ci-filter" placeholder="filter by kind or hash"></div>
+        <table id="cis"><thead><tr><th>ci</th><th>kind</th><th>artifacts</th></tr></thead><tbody></tbody></table>
+        <h2>External ids</h2>
+        <table id="externals"><thead><tr><th>key</th><th>value</th><th>ci</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="ci-detail"><p class="muted">Pick an identity to see its record and every artifact attested to it.</p></div>
+    </div>
+  </section>
+
+  <section id="collections">
+    <div class="two">
+      <div>
+        <table id="cols"><thead><tr><th>name</th><th>items</th><th>attestations</th><th>closure</th></tr></thead><tbody></tbody></table>
+        <form id="f-col-add">
+          <h3>Add an item (creates the collection if the name is new)</h3>
+          <label>collection name</label><input name="name" placeholder="favorites" required>
+          <label>ci</label><input name="ci" placeholder="ci:…" required>
+          <label>label (optional)</label><input name="label">
+          <label>default td (optional)</label><input name="td" placeholder="td:…">
+          <button class="go">Add item</button><div class="out"></div>
+        </form>
+        <form id="f-col-attest">
+          <h3>Carry an attestation</h3>
+          <label>collection name</label><input name="name" required>
+          <label>attestation</label><input name="hash" placeholder="att:…" required>
+          <button class="go">Attest</button><div class="out"></div>
+        </form>
+      </div>
+      <div id="col-detail"><p class="muted">Pick a collection to see its folded items, attestations and ops.</p></div>
+    </div>
+  </section>
+
+  <section id="blobs">
+    <form id="f-blob">
+      <h3>Upload a blob</h3>
+      <input type="file" name="file" required>
+      <button class="go">Upload</button><div class="out"></div>
+    </form>
+    <div class="toolbar"><input id="blob-filter" placeholder="filter by hash or type"></div>
+    <table id="blob-table"><thead><tr><th>hash</th><th>size</th><th>type</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section id="mint">
+    <div class="two">
+      <div>
+        <form id="f-cir">
+          <h3>Mint a Content Identity Record</h3>
+          <label>kind</label><input name="kind" placeholder="song" required>
+          <label>body (JSON object; identifying fields only)</label>
+          <textarea name="body">{"artist": "Uncle Iroh", "title": "Leaves from the Vine"}</textarea>
+          <button class="go">Mint CIR</button><div class="out"></div>
+        </form>
+        <form id="f-tdr">
+          <h3>Mint a Transform Definition Record</h3>
+          <label>kind</label><input name="kind" placeholder="flac-encode" required>
+          <label>body (JSON object; use "variant" to label the artifact)</label>
+          <textarea name="body">{"variant": "flac"}</textarea>
+          <button class="go">Mint TDR</button><div class="out"></div>
+        </form>
+      </div>
+      <div>
+        <form id="f-attest">
+          <h3>Attest content: (ci, td) → blob</h3>
+          <label>ci</label><input name="ci" placeholder="ci:…" required>
+          <label>td</label><input name="td" placeholder="td:…" required>
+          <label>blob</label><input name="blob" placeholder="blob hash" required>
+          <button class="go">Sign attestation</button><div class="out"></div>
+        </form>
+        <form id="f-relation">
+          <h3>Attest a relation</h3>
+          <label>relation</label>
+          <select name="relation"><option>same-as</option><option>superseded-by</option><option>previous-version</option></select>
+          <label>ci</label><input name="ci" placeholder="ci:…" required>
+          <label>other ci</label><input name="other" placeholder="ci:…" required>
+          <button class="go">Sign relation</button><div class="out"></div>
+        </form>
+        <form id="f-record">
+          <h3>Inspect any record</h3>
+          <label>hash or address</label><input name="hash" placeholder="ci: / td: / att: / col: / hex" required>
+          <button class="go">Show</button><div class="out"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const esc = (text) => String(text ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const short = (hash, n = 12) => (hash || '').replace(/^[a-z]+:/, '').slice(0, n);
+const bytes = (n) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n/1024).toFixed(1)} KiB` : n < 1073741824 ? `${(n/1048576).toFixed(1)} MiB` : `${(n/1073741824).toFixed(2)} GiB`;
+
+const tokenInput = $('#token');
+try { tokenInput.value = localStorage.getItem('spirit-token') || ''; } catch (e) {}
+tokenInput.addEventListener('change', () => { try { localStorage.setItem('spirit-token', tokenInput.value); } catch (e) {} });
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {});
+  if (opts.method && opts.method !== 'GET' && tokenInput.value) headers['Authorization'] = 'Bearer ' + tokenInput.value;
+  const response = await fetch(path, Object.assign({}, opts, { headers }));
+  const text = await response.text();
+  let data; try { data = JSON.parse(text); } catch (e) { data = text; }
+  if (!response.ok) throw new Error((data && data.error) || `${response.status} ${text}`);
+  return data;
+}
+async function post(path, body) { return api(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }); }
+
+$$('nav button').forEach(button => button.addEventListener('click', () => {
+  $$('nav button').forEach(b => b.classList.toggle('active', b === button));
+  $$('main > section').forEach(s => s.classList.toggle('active', s.id === button.dataset.tab));
+  refresh(button.dataset.tab);
+}));
+
+function out(form, text, ok) { const el = $('.out', form); el.textContent = text; el.className = 'out ' + (ok ? 'ok' : 'err'); }
+function wire(form, handler) {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = $('button.go', form); button.disabled = true;
+    try { out(form, await handler(new FormData(form)), true); refreshAll(); }
+    catch (e) { out(form, e.message, false); }
+    finally { button.disabled = false; }
+  });
+}
+
+async function loadStatus() {
+  const s = await api('/gateway/stats');
+  $('#who').textContent = `${s.dgid}  ·  up ${Math.floor(s.uptime_secs/3600)}h ${Math.floor(s.uptime_secs%3600/60)}m`;
+  const stats = [
+    ['blobs', s.blobs.count], ['stored', bytes(s.blobs.bytes)], ['peers known', s.peers.known],
+    ['peers live', s.peers.snapshot.filter(p => p.state === 'live' || p.state === 'reachable').length],
+    ['refs', s.refs.length], ['collections', s.collections.length],
+    ['writes', s.writes_enabled ? 'token' : 'disabled'], ['tables open', s.tables.length],
+  ];
+  $('#stat-grid').innerHTML = stats.map(([k, v]) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('')
+    + `<div class="stat"><div class="k">node id</div><div class="v small">${esc(s.node_id)}</div></div>`;
+  $('#peers tbody').innerHTML = s.peers.snapshot.map(p => `<tr>
+    <td class="hash short" title="${esc(p.id)}">${esc(short(p.id))}</td>
+    <td><span class="pill ${p.state === 'live' ? 'ok' : p.state === 'dead' ? 'warn' : ''}">${esc(p.state)}</span></td>
+    <td>${esc(p.path)}</td><td>${p.rtt_ms == null ? '' : p.rtt_ms.toFixed(1) + ' ms'}</td>
+    <td>${bytes(p.sent)} ↑ ${bytes(p.received)} ↓</td><td>${bytes(p.payload)}</td>
+    <td class="muted">${esc((p.refs || []).join(', '))}</td><td class="muted">${esc(p.last_activity)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">no peers yet</td></tr>';
+  $('#refs tbody').innerHTML = s.refs.map(r => `<tr><td>${esc(r.name)}</td><td class="hash">${esc(r.manifest)}</td><td>${r.held} / ${r.total}</td>
+    <td><span class="pill ${r.complete ? 'ok' : 'warn'}">${r.complete ? 'complete' : 'pulling'}</span></td></tr>`).join('') || '<tr><td colspan="4" class="muted">no refs</td></tr>';
+  $('#trust tbody').innerHTML = s.trust.map(t => `<tr><td class="hash">${esc(t.dgid)}</td><td>${esc(t.level)}</td></tr>`).join('');
+  const members = await api('/gateway/members');
+  $('#members tbody').innerHTML = members.map(m => `<tr><td class="hash short" title="${esc(m.node_id)}">${esc(short(m.node_id, 16))}${m.this_device ? ' <span class="pill">this device</span>' : ''}</td>
+    <td><span class="pill ${m.verified && !m.expired ? 'ok' : 'warn'}">${m.expired ? 'expired' : m.verified ? 'member' : 'unverified'}</span></td>
+    <td>${m.this_device ? '' : `<a class="row" data-revoke="${esc(m.node_id)}">revoke</a>`}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">no members</td></tr>';
+}
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a[data-revoke]');
+  if (!link) return;
+  if (!confirm('Revoke ' + link.dataset.revoke.slice(0, 12) + ' from the group?')) return;
+  try { await post('/gateway/revoke', { node_id: link.dataset.revoke }); await loadStatus(); }
+  catch (e) { alert(e.message); }
+});
+wire($('#f-pair'), async () => {
+  const r = await post('/gateway/pair', {});
+  const qr = $('#pair-qr'); qr.textContent = r.qr || ''; qr.hidden = !r.qr;
+  return r.url + '\n(valid ' + r.seconds_left + ' s, one use)';
+});
+wire($('#f-join'), async (data) => {
+  const r = await post('/gateway/join', { url: data.get('url').trim() });
+  return 'joined ' + r.dgid + ' with ' + r.members.length + ' member(s) seeded';
+});
+
+let indexCache = null;
+async function loadIdentities() {
+  indexCache = await api('/gateway/index');
+  renderCis();
+  $('#externals tbody').innerHTML = indexCache.externals.map(e => `<tr><td>${esc(e.key)}</td><td>${esc(e.value)}</td>
+    <td><a class="row hash short" data-ci="${esc(e.ci)}">${esc(short(e.ci))}</a></td></tr>`).join('') || '<tr><td colspan="3" class="muted">none</td></tr>';
+}
+function renderCis() {
+  const filter = $('#ci-filter').value.toLowerCase();
+  const rows = (indexCache?.identities || []).filter(i => !filter || i.kind.includes(filter) || i.ci.includes(filter));
+  $('#cis tbody').innerHTML = rows.map(i => `<tr><td><a class="row hash short" data-ci="${esc(i.ci)}">${esc(short(i.ci, 16))}</a></td>
+    <td>${esc(i.kind)}</td><td>${i.attestations.filter(a => a.kind === 'content').length}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">no identities indexed; mint one and add it to a collection</td></tr>';
+}
+$('#ci-filter').addEventListener('input', renderCis);
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[data-ci]');
+  if (link) { showCi(link.dataset.ci); }
+  const col = event.target.closest('a[data-col]');
+  if (col) { showCollection(col.dataset.col); }
+});
+async function showCi(ci) {
+  $$('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'identities'));
+  $$('main > section').forEach(s => s.classList.toggle('active', s.id === 'identities'));
+  const v = await api('/gateway/artifacts/' + ci.replace(/^ci:/, ''));
+  const name = (v.body && (v.body.name || v.body.title)) || short(v.ci);
+  $('#ci-detail').innerHTML = `
+    <h2>${esc(name)} <span class="pill">${esc(v.kind)}</span></h2>
+    <div class="hash">${esc(v.ci)}</div>
+    <pre>${esc(JSON.stringify(v.body, null, 2))}</pre>
+    <h2>Artifacts</h2>
+    <table><thead><tr><th>variant</th><th>transform</th><th>blob</th><th>signer</th><th>trust</th><th></th></tr></thead><tbody>
+    ${v.artifacts.map(a => `<tr><td>${esc(a.variant || '')}</td><td>${esc(a.td_kind)}<div class="hash short muted">${esc(short(a.td))}</div></td>
+      <td class="hash short" title="${esc(a.blob)}">${esc(short(a.blob))}</td><td class="hash short">${esc(short(a.signer))}</td>
+      <td>${esc(a.level)}${a.expired ? ' <span class="pill warn">expired</span>' : ''}${a.eligible ? '' : a.expired ? '' : ' <span class="pill">untrusted</span>'}</td><td>${a.held ? `<a href="/gateway/blob/${esc(a.blob)}?name=${encodeURIComponent((name + (a.variant ? '.' + a.variant : '')).replace(/[^A-Za-z0-9._-]+/g, '_'))}">download</a>` : '<span class="muted">not held</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">no artifacts attested</td></tr>'}
+    </tbody></table>
+    ${v.pick ? `<p>resolver picks <span class="hash">blob:${esc(v.pick.blob)}</span> at minimum trust ${esc(v.minimum)}</p>` : '<p class="muted">nothing resolves at minimum trust ' + esc(v.minimum) + '</p>'}
+    ${v.relations.length ? '<h2>Relations</h2><table><tbody>' + v.relations.map(r => `<tr><td>${esc(r.kind)}</td><td class="hash short">${esc(short(r.other))}</td><td>${esc(r.level)}</td></tr>`).join('') + '</tbody></table>' : ''}`;
+}
+
+async function loadCollections() {
+  const cols = await api('/gateway/collections');
+  $('#cols tbody').innerHTML = cols.map(c => `<tr><td><a class="row" data-col="${esc(c.name)}">${esc(c.name)}</a></td><td>${c.items}</td><td>${c.attestations}</td><td>${c.closure}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">no collections yet</td></tr>';
+}
+async function showCollection(name) {
+  const v = await api('/gateway/collection/' + name);
+  const ops = await api('/gateway/collection/' + name + '/ops');
+  $('#col-detail').innerHTML = `
+    <h2>${esc(v.name)}</h2>
+    <div class="hash">col:${esc(v.head)}</div>
+    <div class="muted">owner ${esc(v.owner)}${v.forked_from ? ' · forked from ' + esc(v.forked_from) : ''}</div>
+    <h2>Items</h2>
+    <table><thead><tr><th>#</th><th>ci</th><th>kind</th><th>label</th><th></th></tr></thead><tbody>
+    ${v.items.map((i, n) => `<tr><td>${n}</td><td><a class="row hash short" data-ci="${esc(i.ci)}">${esc(short(i.ci))}</a></td><td>${esc(i.kind)}</td><td>${esc(i.label || '')}</td>
+      <td><a class="row" data-remove="${esc(v.name)}|${esc(i.ci)}">remove</a></td></tr>`).join('') || '<tr><td colspan="5" class="muted">empty</td></tr>'}
+    </tbody></table>
+    <h2>Attestations</h2>
+    <table><thead><tr><th>att</th><th>claim</th><th>signer</th><th>trust</th></tr></thead><tbody>
+    ${v.attestations.map(a => `<tr><td class="hash short">${esc(short(a.hash))}</td><td>${esc(a.kind)} <span class="hash short">${esc(short(a.ci))}</span> → <span class="hash short">${esc(short(a.blob || a.other))}</span></td>
+      <td class="hash short">${esc(short(a.signer))}</td><td>${esc(a.level)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">none</td></tr>'}
+    </tbody></table>
+    <h2>Ops</h2>
+    <table><thead><tr><th>seq</th><th>op</th><th>target</th><th></th></tr></thead><tbody>
+    ${ops.map(o => `<tr><td>${o.seq}</td><td>${esc(o.kind)}</td><td class="hash short">${esc(short(o.target))}</td><td><span class="pill ${o.counted ? 'ok' : 'warn'}">${o.counted ? 'owner-signed' : 'ignored'}</span></td></tr>`).join('')}
+    </tbody></table>`;
+}
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a[data-remove]');
+  if (!link) return;
+  const [name, ci] = link.dataset.remove.split('|');
+  try { await post('/gateway/collection/' + name, { op: 'remove', ci }); await showCollection(name); await loadCollections(); }
+  catch (e) { alert(e.message); }
+});
+
+let blobCache = [];
+async function loadBlobs() { blobCache = await api('/gateway/blobs'); renderBlobs(); }
+function renderBlobs() {
+  const filter = $('#blob-filter').value.toLowerCase();
+  const rows = blobCache.filter(b => !filter || b.hash.includes(filter) || b.kind.includes(filter));
+  $('#blob-table tbody').innerHTML = rows.map(b => `<tr><td class="hash">${esc(b.hash)}</td><td>${bytes(b.size)}</td><td>${esc(b.kind)}</td>
+    <td>${b.kind === 'bytes' ? `<a href="/gateway/blob/${esc(b.hash)}?name=${esc(short(b.hash))}">download</a>` : `<a class="row" data-record="${esc(b.hash)}">inspect</a>`}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">empty store</td></tr>';
+}
+$('#blob-filter').addEventListener('input', renderBlobs);
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a[data-record]');
+  if (!link) return;
+  $$('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === 'mint'));
+  $$('main > section').forEach(s => s.classList.toggle('active', s.id === 'mint'));
+  const form = $('#f-record'); form.hash.value = link.dataset.record;
+  form.requestSubmit();
+});
+
+wire($('#f-blob'), async (data) => {
+  const file = data.get('file');
+  const result = await api('/gateway/blob', { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } });
+  return `stored ${file.name} as ${result.hash} (${bytes(result.size)})`;
+});
+wire($('#f-cir'), async (data) => { const r = await post('/gateway/cir', { kind: data.get('kind'), body: JSON.parse(data.get('body')) }); return r.ci; });
+wire($('#f-tdr'), async (data) => { const r = await post('/gateway/tdr', { kind: data.get('kind'), body: JSON.parse(data.get('body')) }); return r.td; });
+wire($('#f-attest'), async (data) => { const r = await post('/gateway/attest', { ci: data.get('ci'), td: data.get('td'), blob: data.get('blob') }); return r.att; });
+wire($('#f-relation'), async (data) => { const r = await post('/gateway/attest', { relation: data.get('relation'), ci: data.get('ci'), other: data.get('other') }); return r.att; });
+wire($('#f-record'), async (data) => {
+  const r = await api('/gateway/record/' + data.get('hash').trim().replace(/^[a-z]+:/, ''));
+  return `${r.kind}  ${r.address}\n${r.signer ? 'signer: ' + r.signer + (r.verified ? ' (signature verifies)' : ' (INVALID)') + '\n' : ''}${JSON.stringify(r.body, null, 2)}`;
+});
+wire($('#f-col-add'), async (data) => {
+  const r = await post('/gateway/collection/' + data.get('name'), { op: 'add', ci: data.get('ci'), label: data.get('label') || null, td: data.get('td') || null });
+  return `refs/${r.name} -> col:${r.head}`;
+});
+wire($('#f-col-attest'), async (data) => {
+  const r = await post('/gateway/collection/' + data.get('name'), { op: 'attest', hash: data.get('hash') });
+  return `refs/${r.name} -> col:${r.head}`;
+});
+
+async function refresh(tab) {
+  try {
+    if (tab === 'status') await loadStatus();
+    if (tab === 'identities') await loadIdentities();
+    if (tab === 'collections') await loadCollections();
+    if (tab === 'blobs') await loadBlobs();
+  } catch (e) { $('#who').textContent = 'gateway unreachable: ' + e.message; }
+}
+async function refreshAll() { for (const tab of ['status', 'identities', 'collections', 'blobs']) await refresh(tab); }
+refreshAll();
+setInterval(() => refresh('status'), 5000);
+</script>
+</body>
+</html>
