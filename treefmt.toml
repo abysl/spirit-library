@@ -1,0 +1,28 @@
+tree-root-file = "treefmt.toml"
+
+[global]
+excludes = [
+  "**/target/**",
+  ".devenv/**",
+  ".direnv/**",
+  "**/build/**",
+  "**/node_modules/**",
+  "**/Cargo.lock",
+  "**/devenv.lock",
+  "**/flake.lock",
+  "**/archive/**",
+]
+
+[formatter.rustfmt]
+command = "rustfmt"
+includes = ["*.rs"]
+options = ["--edition", "2021"]
+
+[formatter.taplo]
+command = "taplo"
+includes = ["*.toml"]
+options = ["fmt"]
+
+[formatter.alejandra]
+command = "alejandra"
+includes = ["*.nix"]

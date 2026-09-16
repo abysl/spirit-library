@@ -1,5 +1,11 @@
 # spirit — Specification
 
+Audience: protocol implementers and compatibility reviewers. Read the
+[architecture overview](design/architecture.md) and
+[vocabulary](design/terminology.md) first. This is a normative reference, not
+an installation tutorial; begin with [getting started](getting-started.md)
+to use the command-line tool.
+
 > **This document is the source of truth.** Where any other spirit document,
 > the README, AGENTS.md, a crate wiki or a plan disagrees with this one, this
 > one wins and the other is to be corrected. The older design docs are kept
@@ -767,7 +773,7 @@ consumer knowledge arrive this way and never live in spirit.
 cannot speak iroh, and a browser UI at `/` for the daemon's operator. It is
 hand-rolled over tokio TCP by design; introducing hyper, axum or a TLS stack
 is a regression. Exposure beyond localhost is a reverse proxy's job, and the
-proxy decides who can reach it: spirit.rae.blue is tailnet-only.
+proxy decides who can reach it. Operators must provide their own access controls.
 
 Reads are open to whoever can reach the port: status and stats, the ref
 list, the blob list, any blob by hash (with `?name=` for a download
@@ -914,7 +920,7 @@ the gap the markers above describe.
 | 5 | ✅ 2026-09-07 — `device` CIR, the `device-group` collection, and trust derived from folded membership | 6.2, 6.3 |
 | 6 | ✅ 2026-09-07 — `spirit-pair/0`, `spirit pair`, `spirit join` | 6.4 |
 | 7 | ✅ 2026-09-08 — `Blobs` trait in core; the node references the flat files from iroh and exports pulls by moving them, so bytes exist once; the old copied `iroh/` index is rebuilt on first start | 4.2 |
-| 8 | ⏸ blocked — Delete the legacy readers: `core/modules.rs`, the envelope's 64-hex scan, `schema::modules::legacy_versions`. The deployed `hob` and `riftbound` manifests on dev1 and dev2 declare no `refs`, and their modules are legacy refs, so deleting these today stops that content replicating and kai.rae.blue's modules resolving. Unblocked once agni's importers write `refs` into every manifest, the fleet re-ingests, and modules are republished as collections | 5.1 |
+| 8 | Compatibility work — Retain `core/modules.rs`, the envelope's legacy hash scan, and `schema::modules::legacy_versions` while supported stores may contain manifests without declared `refs` or legacy module pointers. Removing these readers requires a documented migration to explicit replication closures and module collections | 5.1 |
 | 9 | ✅ 2026-09-08 — `card`, `card-printing`, catalog moved to `agni-importers::cards`; `item` kind added | 12 |
 | 10 | ✅ 2026-09-08 — TDR `variant` and `snapshot` read by the resolver; ranking by preferred transform, snapshot and expiry | 5.3, 7.3 |
 | 11 | ✅ 2026-09-08 — `routing::artifacts` behind `spirit-node resolve --td` and the gateway's artifacts route | 7.4, 9.5 |

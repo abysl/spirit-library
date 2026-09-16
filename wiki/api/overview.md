@@ -1,96 +1,68 @@
-# spirit — Developer API (Overview)
+# Integrating Spirit into an application
 
-> **Superseded.** [spec.md](../spec.md) is the source of truth for spirit's design; where this document disagrees with it, the spec wins. This page is kept for its rationale and prior-art discussion.
+Audience: application developers who know Rust but have not used Spirit.
+Read the [architecture overview](../design/architecture.md) for the record
+vocabulary.
 
-> **Status: pre-implementation sketch.** Nothing here is built yet. These pages
-> describe the *intended* developer surface so we can pressure-test it against
-> the design before writing code. Signatures are illustrative and will change.
-> When something here contradicts a design doc, the design doc wins — open an
-> issue so we reconcile them.
+## Choose an ownership model first
 
-## What this is
+If several applications need one store, let one daemon own it and communicate
+through the local API. If one application owns the store for its lifetime, it
+can embed the node. Do not start two endpoint owners on the same directory.
 
-This folder sketches the API a developer touches when building a CLI tool or an
-app on spirit — before that API exists. It is a design instrument: writing the
-calls a real app would make is the fastest way to find out whether the
-primitives compose the way the design claims they do.
+The local API carries the gateway's request/response shapes over a
+length-framed CBOR socket. See [specification section 9](../spec.md#9-the-daemon)
+for the transport contract.
 
-The protocol layers (`core`, `index`, `routing`, `schema`) are unopinionated;
-`sdk` is where app-facing convenience lives. The mock surface mixes both — it is
-organized by *what a developer is trying to do*, not by crate boundaries. Each
-entry notes which crate would own it.
+## Choose the library boundary
 
-## Who it's for
+- `spirit-client` supplies application-oriented operations. Start with its
+  public types and tests when building a client.
+- `spirit-sdk` re-exports the protocol crates; it is not a high-level
+  `Node::open(...)` facade.
+- `spirit-node` supports embedded service ownership and protocol registration.
+- `spirit-client-ffi` exposes the foreign-language boundary used by the
+  experimental [Kotlin bindings](../../kotlin/README.md).
 
-- **App developers** — music players, manga readers, package managers, file
-  browsers — who want a shared content store and cross-app identity without
-  running a server.
-- **CLI authors** — `oasis`, `bumi`, and the like — who drive resolution and
-  builds directly.
+Use the source and tests in your pinned revision for exact signatures.
+The old [mock API](mock-api.md) is a proposal, not compilable sample code.
 
-If you are implementing the protocol itself, start with the
-[design docs](../design/architecture.md), not here.
+## Read content by identity
 
-## The two lifecycles to internalize first
+Build the index from the store's followed collections. Ask for attestations
+about the identity. Pass candidates through the routing policy and local
+trust. Fetch the chosen blob and verify its hash before using it.
 
-Almost everything an app does is one of these two flows. The
-[mock API](mock-api.md) expands both into real calls.
+Decide how your application handles missing, untrusted, and expired claims.
+Do not treat all three as the same network error, and do not execute fetched
+bytes merely because their hash is valid.
 
-**Read path — resolve a content identity to bytes:**
+## Publish content
 
-```
-1. core    ci = blake3(canonical(cir))              // address the identity
-2. index   atts = index.attestations_for(ci)        // local (ci,td)→blob claims
-3. core    atts = atts.filter(trust_policy)          // keep only trusted signers
-4. routing blob = resolution_policy.pick(atts)       // quality / cache / trust
-   └─ on miss: routing federates to trusted peers (local → cluster → network)
-5. blobs   bytes = blobs.fetch(blob)                 // from ANYONE, trusted or not
-6. core    assert blake3(bytes) == blob              // self-verify; trust the bytes
-```
+Create identity and transform records, store the content bytes, and sign a
+content attestation with the store's group identity. Include the records and
+attestation in a collection, then publish through the collection/ref APIs.
 
-**Write path — produce bytes for a CI and attest them:**
+A record omitted from the declared replication closure may remain available
+only on the original device. Direct filesystem writes to `refs/` bypass the
+supported update path.
 
-```
-1. author  unlocked_tdr  (recipe with {query}/{ci} inputs)
-2. routing locked_tdr = lock(unlocked_tdr)           // pin each input CI→blob
-3. runtime bytes = execute(locked_tdr)               // build / transcode / fetch
-4. core    blob = blake3(bytes)
-5. core    att = sign((ci, td) → blob, group_key)    // content attestation
-6. index   index.put(att); gossip.publish(att); blobs.add(bytes)
-```
+## Supply capabilities explicitly
 
-The single rule under both: **trust gates the CI→blob mapping, never the bytes.**
-You verify bytes by hash and may fetch them from anyone.
+Spirit describes transforms but does not supply a general runtime. An
+application provides fetch and execution hooks if it needs them. Similarly,
+extra network protocols are registered by the embedding application rather
+than hard-coded into Spirit.
 
-## The two UX mechanisms apps surface
+Keep application-specific schemas in your application. Never place game or
+media knowledge in the generic replication layer to fix a missing record.
 
-Most apps expose content as **collections** (playlists, package sets, reading
-lists, release feeds). Two verbs cover how a user relates to someone else's
-collection:
+## Verify your integration
 
-- **Follow** — the default. Trust the collection's owner, pull their ops
-  automatically, and optionally *suggest* changes back as a signed op the owner
-  can approve and append. The user maintains no variant of their own; they ride
-  the living, curated collection.
-- **Fork** — make the collection yours: re-sign its ops under your own key while
-  retaining the originals for provenance. A fork does not track its source (in
-  v1). Forking is for when you disagree with upstream curation.
+Use temporary stores and synthetic content. Test a missing blob, an invalid
+signature, an untrusted signer, and two devices making collection edits.
+If embedding networking, also test clean shutdown and refusal of a second
+owner of the same store.
 
-See [collections.md](../../schema/wiki/design/collections.md) for the model and
-[mock-api.md](mock-api.md#collections) for the calls.
-
-## How to read these pages
-
-- [terminology.md](../design/terminology.md) — record names and the blob-hash
-  convention these signatures use.
-- [mock-api.md](mock-api.md) — the full sketched surface, grouped by task:
-  node/session, identity & groups, CIRs, resolution, build & attest, blobs,
-  collections (follow/fork/suggest/append), and relations.
-
-## Stability
-
-Pre-1.0, pre-implementation. Treat every name here as a placeholder. The value
-is in the *shape* — the arguments a call needs, the order of operations, where
-trust enters — not the spelling.
-</content>
-</invoke>
+See the [development guide](../development.md) for workspace commands and the
+[specification](../spec.md) before changing an on-disk or wire format.
