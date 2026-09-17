@@ -70,3 +70,18 @@ are different things.
 
 Rebuild after editing the CLI; formatting and linting do not update the binary.
 Use `spirit-node help` for the arguments supported by your checkout.
+
+## Published-only application stores
+
+Applications can call `spirit_node::serve_published(dir, seeds)` for an
+operator-staged store that must not ingest peer content. The restriction is
+installed before the network loop: automatic convergence and queued blob
+downloads are disabled and cannot be reenabled with `set_replicate(true)`.
+Gossip and serving locally staged blobs remain available. Normal Spirit
+startup retains its existing replication behavior.
+
+This mode serves all bytes in the chosen store. It is not an allowlist for a
+mixed store, and it does not revoke trusted filesystem or authenticated local
+administration. Consumers must stage only approved content in a dedicated
+store and make their application resolvers read-only. Consumer-specific
+schemas and approval policy remain outside Spirit.

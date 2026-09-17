@@ -46,6 +46,7 @@ pub struct Mesh {
     marks: Mutex<BTreeMap<String, GossipMark>>,
     started: Instant,
     replicate: AtomicBool,
+    published_only: AtomicBool,
     backfill: Mutex<Option<Backfill>>,
     backfilled: Mutex<BTreeMap<String, Instant>>,
     table: Mutex<Option<TableAdvert>>,
@@ -268,6 +269,7 @@ impl Mesh {
             marks: Mutex::new(BTreeMap::new()),
             started: Instant::now(),
             replicate: AtomicBool::new(true),
+            published_only: AtomicBool::new(false),
             backfill: Mutex::new(None),
             backfilled: Mutex::new(BTreeMap::new()),
             table: Mutex::new(None),
@@ -493,7 +495,19 @@ impl Mesh {
     }
 
     pub fn set_replicate(&self, replicate: bool) {
-        self.replicate.store(replicate, Ordering::Relaxed);
+        self.replicate.store(
+            replicate && !self.published_only.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
+    }
+
+    pub fn publish_only(&self) {
+        self.published_only.store(true, Ordering::Relaxed);
+        self.set_replicate(false);
+    }
+
+    pub fn accepts_downloads(&self) -> bool {
+        !self.published_only.load(Ordering::Relaxed)
     }
 
     pub fn replicates(&self) -> bool {
@@ -894,6 +908,9 @@ impl Mesh {
     }
 
     pub fn request_blob(&self, hash: BlobHash, provider: Option<&str>) {
+        if !self.accepts_downloads() {
+            return;
+        }
         self.blob_wants
             .lock()
             .unwrap()
@@ -1183,6 +1200,9 @@ pub async fn fetch_blob(
 
 #[cfg(feature = "native")]
 async fn fetch_wanted_blobs(mesh: &Arc<Mesh>, endpoint: &Endpoint, iroh_store: &FsStore) {
+    if !mesh.accepts_downloads() {
+        return;
+    }
     let wants = mesh.wanted_blobs();
     if wants.is_empty() {
         return;

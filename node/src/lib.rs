@@ -231,6 +231,22 @@ pub async fn serve_mesh_with(
     wants: &[String],
     register: impl FnOnce(iroh::protocol::RouterBuilder) -> iroh::protocol::RouterBuilder,
 ) -> Result<Serving, Box<dyn Error>> {
+    serve_mesh_mode(dir, seeds, wants, false, register).await
+}
+
+#[cfg(feature = "native")]
+pub async fn serve_published(dir: &Path, seeds: &[String]) -> Result<Serving, Box<dyn Error>> {
+    serve_mesh_mode(dir, seeds, &[], true, |router| router).await
+}
+
+#[cfg(feature = "native")]
+async fn serve_mesh_mode(
+    dir: &Path,
+    seeds: &[String],
+    wants: &[String],
+    published_only: bool,
+    register: impl FnOnce(iroh::protocol::RouterBuilder) -> iroh::protocol::RouterBuilder,
+) -> Result<Serving, Box<dyn Error>> {
     let store_lock = lock::StoreLock::take(dir)?;
     let store = BlobStore::open(dir)?;
     let iroh_store = blobs::open_iroh(dir).await?;
@@ -269,6 +285,9 @@ pub async fn serve_mesh_with(
     }
 
     let mesh = Mesh::new(dir, endpoint.clone());
+    if published_only {
+        mesh.publish_only();
+    }
     mesh.note_served(served);
     for seed in seeds {
         mesh.seed(seed)?;
@@ -437,5 +456,20 @@ mod tests {
         std::fs::write(dir.join("identity").join("node"), "not a key").unwrap();
         assert!(node_secret(&dir).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn published_mesh_cannot_be_reenabled_or_queue_peer_downloads() {
+        let endpoint = Endpoint::builder(presets::N0).bind().await.unwrap();
+        let dir = scratch_dir("published");
+        let mesh = Mesh::new(&dir, endpoint.clone());
+        mesh.publish_only();
+        mesh.set_replicate(true);
+        mesh.request_blob(BlobHash::of(b"unapproved"), None);
+        assert!(!mesh.replicates());
+        assert!(!mesh.accepts_downloads());
+        assert!(mesh.wanted_blobs().is_empty());
+        endpoint.close().await;
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
